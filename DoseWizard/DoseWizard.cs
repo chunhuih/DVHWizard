@@ -145,6 +145,8 @@ namespace DoseWizard
                 return;
             }
 
+            WriteBasicDosimetricData();
+            
             /// Now obtain the planning CT image.
             Image imageForPlan = planToUse.StructureSet.Image;
 
@@ -154,11 +156,12 @@ namespace DoseWizard
             double yres = 2.5;
             double zres = 3.0;  // Here we standardize the image resolutions.
 
+            Dose doseForPlan = selectedPlan.Dose;
+            DoseValue.DoseUnit doseUnit = doseForPlan.DoseMax3D.Unit;
+
             int xcount = (int)((doseForPlan.XRes * doseForPlan.XSize) / xres);
             System.Collections.BitArray segmentStride = new System.Collections.BitArray(xcount);
             double[] doseArray = new double[xcount];
-            Dose doseForPlan = selectedPlan.Dose;
-            DoseValue.DoseUnit doseUnit = doseForPlan.DoseMax3D.Unit;
 
             selectedPlan.DoseValuePresentation = DoseValuePresentation.Absolute;
 
@@ -208,6 +211,105 @@ namespace DoseWizard
                 if (flag) sliceCount++;
             }
             return;
+        }
+
+        private void WriteBasicDosimetricData(Patient patient, PlanSetup plan, Structure structure)
+        {
+            string fileName = "basic dosimetric.txt";
+            if (!File.Exists(fileName))
+            {
+                using (StreamWriter writer = File.CreateText(fileName))
+                {
+                    for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                    {
+                        writer.Write("V{0:0}\t", doseInGray);
+                    }
+                    for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                    {
+                        writer.Write("V{0:0}_r\t", doseInGray);
+                    }
+                    writer.Write("Mean\tMedian\tMaxDose\tVolume\n");
+                }
+            }
+
+            using (StreamWriter writer = File.AppendText(fileName))
+            {
+                for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                {
+                    DoseValue doseValue = new DoseValue(doseInGray * 100.0, DoseValue.DoseUnit.cGy);
+                    double volumeAbsolute = plan.GetVolumeAtDose(structure, doseValue, VolumePresentation.AbsoluteCm3);
+                    writer.Write("{0:0.00}\t", volumeAbsolute);
+                }
+                for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                {
+                    DoseValue doseValue = new DoseValue(doseInGray * 100.0, DoseValue.DoseUnit.cGy);
+                    double volumeRelative = plan.GetVolumeAtDose(structure, doseValue, VolumePresentation.Relative);
+                    writer.Write("{0:0.00}\t", volumeRelative, volumeRelative);
+                }
+                DVHData dvhData = plan.GetDVHCumulativeData(structure, DoseValuePresentation.Absolute, VolumePresentation.AbsoluteCm3, 0.001);
+                double meanDose = dvhData.MeanDose.Dose;
+                double medianDose = dvhData.MedianDose.Dose;
+                double maxDose = dvhData.MaxDose.Dose;
+                double volume = dvhData.Volume;
+                writer.Write("{0:0.00}\t{0:0.00}\t{0:0.00}\t{0:0.00}\n", meanDose, medianDose, maxDose, volume);
+            }
+        }
+
+        private void WriteBasicDosimetricData(Patient patient, PlanSum plan, Structure structure)
+        {
+            string fileName = "basic dosimetric.txt";
+            DVHData dvhAbsolute = plan.GetDVHCumulativeData(structure, DoseValuePresentation.Absolute, VolumePresentation.AbsoluteCm3, 0.001);
+            DVHData dvhRelative = plan.GetDVHCumulativeData(structure, DoseValuePresentation.Absolute, VolumePresentation.AbsoluteCm3, 0.001);
+            if (!File.Exists(fileName))
+            {
+                using (StreamWriter writer = File.CreateText(fileName))
+                {
+                    for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                    {
+                        writer.Write("V{0:0}\t", doseInGray);
+                    }
+                    for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                    {
+                        writer.Write("V{0:0}_r\t", doseInGray);
+                    }
+                    writer.Write("Mean\tMedian\tMaxDose\tVolume\n");
+                }
+            }
+
+            using (StreamWriter writer = File.AppendText(fileName))
+            {
+                for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                {
+                    DoseValue doseValue = new DoseValue(doseInGray * 100.0, DoseValue.DoseUnit.cGy);
+                    double volumeAbsolute = FindVolumeAtDose(dvhRelative, structure, doseValue);
+                    writer.Write("{0:0.00}\t", volumeAbsolute);
+                }
+                for (int doseInGray = 10; doseInGray <= 70; doseInGray += 5)
+                {
+                    DoseValue doseValue = new DoseValue(doseInGray * 100.0, DoseValue.DoseUnit.cGy);
+                    double volumeRelative = FindVolumeAtDose(dvhAbsolute, structure, doseValue);
+                    writer.Write("{0:0.00}\t", volumeRelative);
+                }
+                double meanDose = dvhAbsolute.MeanDose.Dose;
+                double medianDose = dvhAbsolute.MedianDose.Dose;
+                double maxDose = dvhAbsolute.MaxDose.Dose;
+                double volume = dvhAbsolute.Volume;
+                writer.Write("{0:0.00}\t{0:0.00}\t{0:0.00}\t{0:0.00}\n", meanDose, medianDose, maxDose, volume);
+            }
+        }
+
+        /// <summary>
+        /// This method returns the volume in a DVH curve for a given dose.
+        /// </summary>
+        /// <param name="dvhData"></param>
+        /// <param name="structure"></param>
+        /// <param name="doseValue"></param>
+        /// <returns></returns>
+        public static double FindVolumeAtDose(DVHData dvhData, Structure structure, DoseValue doseValue)
+        {
+            DVHPoint[] hist = dvhData.CurveData;
+            int index = (int)(hist.Length * doseValue.Dose / dvhData.MaxDose.Dose);
+            return hist[index].Volume;
         }
     }
 }

@@ -19,5 +19,4 @@ namespace Common
             planId = c;
         }
     }
-
 }

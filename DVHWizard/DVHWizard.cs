@@ -38,14 +38,14 @@ namespace DVHWizard
                     string line;
                     line = sr.ReadLine();
                     // The first line is the header.
-                    if(line == null || line.Split()[0] != "MRN")
+                    if (line == null || line.Split()[0] != "MRN")
                     {
                         Console.WriteLine("Input file invalid!!");
                         Environment.Exit(1);
                     }
                     while ((line = sr.ReadLine()) != null)
                     {
-                        if(line.Split().Length != 2)
+                        if (line.Split().Length != 2)
                         {
                             Console.WriteLine("Invalid input: " + line + "\n\n");
                             continue;
