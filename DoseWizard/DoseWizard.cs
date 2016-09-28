@@ -145,8 +145,15 @@ namespace DoseWizard
                 return;
             }
 
-            WriteBasicDosimetricData();
-            
+            if (isPlanSum)
+            {
+                WriteBasicDosimetricData(patient, planSumToUse, structureEsophagus);
+            }
+            else
+            {
+                WriteBasicDosimetricData(patient, planToUse, structureEsophagus);
+
+            }
             /// Now obtain the planning CT image.
             Image imageForPlan = planToUse.StructureSet.Image;
 
@@ -213,7 +220,7 @@ namespace DoseWizard
             return;
         }
 
-        private void WriteBasicDosimetricData(Patient patient, PlanSetup plan, Structure structure)
+        private static void WriteBasicDosimetricData(Patient patient, PlanSetup plan, Structure structure)
         {
             string fileName = "basic dosimetric.txt";
             if (!File.Exists(fileName))
@@ -255,7 +262,7 @@ namespace DoseWizard
             }
         }
 
-        private void WriteBasicDosimetricData(Patient patient, PlanSum plan, Structure structure)
+        private static void WriteBasicDosimetricData(Patient patient, PlanSum plan, Structure structure)
         {
             string fileName = "basic dosimetric.txt";
             DVHData dvhAbsolute = plan.GetDVHCumulativeData(structure, DoseValuePresentation.Absolute, VolumePresentation.AbsoluteCm3, 0.001);
